@@ -21,3 +21,4 @@ npm run dev
 ## Environment Variables
 *   `DATABASE_URL`: Postgres Connection String.
 *   `JWT_SECURITY_KEY`: Private key for signing tokens.
+
