@@ -12,7 +12,7 @@ export const downloadAttendanceTemplate = async (req: AuthenticatedRequest, res:
     // Define headers
     const headers = [
         ['Student ID', 'Subject Code', 'Semester', 'Attended Classes', 'Total Classes'],
-        ['O210001', 'SUB-CSE-101', 'SEM-1', 25, 30] // Example row
+        ['O210001', 'E1-SEM-1-CSE-1', 'SEM-1', 25, 30] // Example row with realistic code
     ];
     
     const wb = xlsx.utils.book_new();
@@ -29,7 +29,7 @@ export const downloadAttendanceTemplate = async (req: AuthenticatedRequest, res:
 export const downloadGradesTemplate = async (req: AuthenticatedRequest, res: Response) => {
     const headers = [
         ['Student ID', 'Subject Code', 'Semester', 'Grade'],
-        ['O210001', 'SUB-CSE-101', 'SEM-1', 9] // Example row
+        ['O210001', 'E1-SEM-1-CSE-1', 'SEM-1', 9] // Example row
     ];
     
     const wb = xlsx.utils.book_new();
@@ -58,14 +58,10 @@ export const uploadAttendance = async (req: AuthenticatedRequest, res: Response)
         let failCount = 0;
         const errors: any[] = [];
 
-        // Expected JSON keys matching the header row (SheetJS normalizes headers? No, it uses row 1 string match usually)
-        // xlsx.read converts headers to keys. "Student ID" -> "Student ID"
-        // We should normalize keys or expect specific ones.
-        
         for (const row of data) {
-            // Helper to get value loosely (case insensitive keys if needed, but let's assume template usage)
-            const studentId = row['Student ID'];
-            const subjectCode = row['Subject Code'];
+            // Helper to get value loosely
+            let studentId = row['Student ID'];
+            let subjectCode = row['Subject Code'];
             const semester = row['Semester'];
             const attended = Number(row['Attended Classes']);
             const total = Number(row['Total Classes']);
@@ -74,6 +70,10 @@ export const uploadAttendance = async (req: AuthenticatedRequest, res: Response)
                 failCount++;
                 continue;
             }
+
+            // Normalize
+            studentId = String(studentId).toUpperCase();
+            subjectCode = String(subjectCode).toUpperCase();
 
             // Find Subject ID by Code
             const subject = await prisma.subject.findUnique({ where: { code: subjectCode } });
@@ -123,8 +123,8 @@ export const uploadGrades = async (req: AuthenticatedRequest, res: Response) => 
         const errors: any[] = [];
 
         for (const row of data) {
-            const studentId = row['Student ID'];
-            const subjectCode = row['Subject Code'];
+            let studentId = row['Student ID'];
+            let subjectCode = row['Subject Code'];
             const semester = row['Semester'];
             const grade = Number(row['Grade']); // Assuming float/int
             
@@ -132,6 +132,9 @@ export const uploadGrades = async (req: AuthenticatedRequest, res: Response) => 
                 failCount++;
                 continue;
             }
+
+            studentId = String(studentId).toUpperCase();
+            subjectCode = String(subjectCode).toUpperCase();
 
             const subject = await prisma.subject.findUnique({ where: { code: subjectCode } });
             if (!subject) {
