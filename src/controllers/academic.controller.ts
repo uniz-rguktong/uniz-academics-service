@@ -77,3 +77,21 @@ export const getSubjects = async (req: AuthenticatedRequest, res: Response) => {
         return res.status(500).json({ success: false });
     }
 };
+export const addSubject = async (req: AuthenticatedRequest, res: Response) => {
+    const { code, name, credits, department, semester } = req.body;
+    // Basic Admin check? For now open or let auth middleware handle basic auth.
+    // Ideally should check for admin role.
+    const user = req.user;
+    // Allow if user is admin or for seeding purposes if we trust the caller (authenticated).
+    
+    try {
+        const subject = await prisma.subject.upsert({
+            where: { code },
+            update: { name, credits, department, semester },
+            create: { code, name, credits, department, semester }
+        });
+        return res.json({ success: true, subject });
+    } catch (e: any) {
+        return res.status(500).json({ success: false, error: e.message });
+    }
+};

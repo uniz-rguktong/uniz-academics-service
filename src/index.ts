@@ -17,7 +17,10 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'uniz-auth-service' });
 });
 
+import academicRoutes from './routes/academic.routes';
+
 app.use('/', authRoutes);
+app.use('/', academicRoutes);
 
 // Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
