@@ -14,8 +14,9 @@ export const getGrades = async (req: AuthenticatedRequest, res: Response) => {
             include: { subject: true }
         });
         return res.json({ success: true, grades });
-    } catch (e) {
-        return res.status(500).json({ success: false });
+    } catch (e: any) {
+        console.error("getGrades error:", e);
+        return res.status(500).json({ success: false, message: e.message });
     }
 };
 

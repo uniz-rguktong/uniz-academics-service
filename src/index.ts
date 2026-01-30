@@ -19,7 +19,7 @@ app.get('/health', (req, res) => {
 
 import academicRoutes from './routes/academic.routes';
 
-app.use('/', authRoutes);
+// app.use('/', authRoutes);
 app.use('/', academicRoutes);
 
 // Error Handler
