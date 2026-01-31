@@ -1,6 +1,5 @@
 {
-  "version": 2,
-  "buildCommand": "prisma generate",
+  "regions": ["sin1"],
   "builds": [
     {
       "src": "api/index.ts",

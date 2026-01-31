@@ -4,16 +4,31 @@ import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 const prisma = new PrismaClient();
 
+import { redis } from '../utils/redis.util';
+
 export const getGrades = async (req: AuthenticatedRequest, res: Response) => {
     const user = req.user;
     if (!user) return res.status(401).json({ success: false });
     
     try {
+        const cacheKey = `grades:${user.username}`;
+        
+        // 1. Try Redis Cache first
+        const cachedGrades = await redis.get(cacheKey);
+        if (cachedGrades) {
+            return res.json({ success: true, grades: JSON.parse(cachedGrades), source: 'cache' });
+        }
+
+        // 2. Database Fallback
         const grades = await prisma.grade.findMany({
             where: { studentId: user.username },
             include: { subject: true }
         });
-        return res.json({ success: true, grades });
+
+        // 3. Save to Redis for 5 minutes
+        await redis.setex(cacheKey, 300, JSON.stringify(grades));
+
+        return res.json({ success: true, grades, source: 'db' });
     } catch (e: any) {
         console.error("getGrades error:", e);
         return res.status(500).json({ success: false, message: e.message });
@@ -22,7 +37,6 @@ export const getGrades = async (req: AuthenticatedRequest, res: Response) => {
 
 export const addGrades = async (req: AuthenticatedRequest, res: Response) => {
     const { studentId, semesterId, grades } = req.body;
-    // Admin/Faculty check usually goes here
     
     try {
         const results = await Promise.all(grades.map((g: any) => 
@@ -32,6 +46,10 @@ export const addGrades = async (req: AuthenticatedRequest, res: Response) => {
                 create: { studentId, subjectId: g.subjectId, semesterId, grade: g.grade }
             })
         ));
+
+        // Invalidate Cache
+        await redis.del(`grades:${studentId}`);
+
         return res.json({ success: true, count: results.length });
     } catch (e) {
         return res.status(500).json({ success: false });
