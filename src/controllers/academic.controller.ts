@@ -362,7 +362,8 @@ export const addAttendance = async (req: AuthenticatedRequest, res: Response) =>
     }
 };
 
-import { sendResultEmail } from '../utils/email.util';
+import axios from 'axios';
+const GATEWAY_URL = process.env.GATEWAY_URL || 'https://uniz-production-gateway.vercel.app/api/v1';
 
 export const publishResults = async (req: AuthenticatedRequest, res: Response) => {
     const user = req.user;
@@ -374,7 +375,7 @@ export const publishResults = async (req: AuthenticatedRequest, res: Response) =
     if (!semesterId) return res.status(400).json({ success: false, message: 'Semester ID required' });
 
     try {
-        // 1. Fetch ALL grades for the semester (Optimize query)
+        // 1. Fetch ALL grades for the semester
         const grades = await prisma.grade.findMany({
             where: { semesterId },
             include: { subject: true }
@@ -392,26 +393,38 @@ export const publishResults = async (req: AuthenticatedRequest, res: Response) =
         });
 
         const students = Object.keys(studentGrades);
-        console.log(`Sending results to ${students.length} students...`);
+        console.log(`Sending results to ${students.length} students via Mail Service...`);
 
-        // 3. Send Emails in Chunks (Limit concurrency to 10)
+        // 3. Send Emails via Microservice
         let sentCount = 0;
-        const chunk = 10;
-        
-        // We will process asynchronously but wait for completion to report stats. 
-        // WARNING: On Vercel, if this takes >10s (Hobby) or >60s (Pro), it will timeout.
-        // For production "All Students", use a Queue. For this demo, we proceed.
+        const chunk = 20; // Improved concurrency for HTTP calls
         
         for (let i = 0; i < students.length; i += chunk) {
             const batch = students.slice(i, i + chunk);
             await Promise.all(batch.map(async (studentId) => {
-                const email = `${studentId.toLowerCase()}@rguktong.ac.in`; // Heuristic
-                const success = await sendResultEmail(email, studentId, semesterId, studentGrades[studentId]);
-                if (success) sentCount++;
+                const email = `${studentId.toLowerCase()}@rguktong.ac.in`;
+                try {
+                    // Call Mail Service
+                    await axios.post(`${GATEWAY_URL}/mail/send`, {
+                        type: 'results',
+                        to: email,
+                        data: {
+                            username: studentId,
+                            semesterId,
+                            grades: studentGrades[studentId]
+                        }
+                    }, {
+                       // Internal Secret potentially needed in future
+                       headers: { 'x-internal-secret': process.env.INTERNAL_SECRET || 'uniz-core' }
+                    });
+                    sentCount++;
+                } catch (e) {
+                    console.error(`Failed to send result mail to ${studentId}:`, e.message);
+                }
             }));
         }
 
-        return res.json({ success: true, message: 'Results published', total: students.length, sent: sentCount });
+        return res.json({ success: true, message: 'Results published (queued)', total: students.length, sent: sentCount });
     } catch (e: any) {
         return res.status(500).json({ success: false, error: e.message });
     }
