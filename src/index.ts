@@ -7,14 +7,14 @@ import authRoutes from './routes/auth.routes';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3004;
 
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'uniz-auth-service' });
+  res.status(200).json({ status: 'ok', service: 'uniz-academics-service' });
 });
 
 import academicRoutes from './routes/academic.routes';
@@ -32,5 +32,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 app.listen(PORT, () => {
-  console.log(`Auth Service running on port ${PORT}`);
+  console.log(`Academics Service running on port ${PORT}`);
 });

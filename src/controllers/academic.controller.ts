@@ -418,7 +418,7 @@ export const publishResults = async (req: AuthenticatedRequest, res: Response) =
                        headers: { 'x-internal-secret': process.env.INTERNAL_SECRET || 'uniz-core' }
                     });
                     sentCount++;
-                } catch (e) {
+                } catch (e: any) {
                     console.error(`Failed to send result mail to ${studentId}:`, e.message);
                 }
             }));
