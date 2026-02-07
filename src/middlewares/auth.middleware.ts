@@ -7,13 +7,13 @@ const SECRET = process.env.JWT_SECURITY_KEY;
 if (!SECRET && process.env.NODE_ENV === "production") {
   throw new Error("JWT_SECURITY_KEY is required in production");
 }
-const JWT_SECRET: string = SECRET || "default_secret_unsafe";
+const JWT_SECRET: string = (SECRET || "default_secret_unsafe").trim();
 
 const I_SECRET = process.env.INTERNAL_SECRET;
 if (!I_SECRET && process.env.NODE_ENV === "production") {
   throw new Error("INTERNAL_SECRET is required in production");
 }
-const INTERNAL_SECRET = I_SECRET || "uniz-core";
+const INTERNAL_SECRET = (I_SECRET || "uniz-core").trim();
 
 export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
@@ -39,12 +39,10 @@ export const authMiddleware = (
 
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-    return res
-      .status(401)
-      .json({
-        code: ErrorCode.AUTH_UNAUTHORIZED,
-        message: "No token provided",
-      });
+    return res.status(401).json({
+      code: ErrorCode.AUTH_UNAUTHORIZED,
+      message: "No token provided",
+    });
   }
 
   const token = authHeader.split(" ")[1];
@@ -53,21 +51,17 @@ export const authMiddleware = (
     // Validate shape
     const parsed = JwtPayloadSchema.safeParse(payload);
     if (!parsed.success) {
-      return res
-        .status(401)
-        .json({
-          code: ErrorCode.AUTH_UNAUTHORIZED,
-          message: "Invalid token structure",
-        });
+      return res.status(401).json({
+        code: ErrorCode.AUTH_UNAUTHORIZED,
+        message: "Invalid token structure",
+      });
     }
     (req as AuthenticatedRequest).user = parsed.data;
     next();
   } catch (error) {
-    return res
-      .status(401)
-      .json({
-        code: ErrorCode.AUTH_TOKEN_EXPIRED,
-        message: "Invalid or expired token",
-      });
+    return res.status(401).json({
+      code: ErrorCode.AUTH_TOKEN_EXPIRED,
+      message: "Invalid or expired token",
+    });
   }
 };
