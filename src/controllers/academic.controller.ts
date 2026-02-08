@@ -787,14 +787,18 @@ export const publishResults = async (
     try {
       console.log(`[GRADES-PUBLISH] Starting for ${semesterId}, Year: ${year}`);
       let effectiveSemesterId: any = semesterId;
-      if (semesterId && year && !semesterId.includes(year)) {
-        effectiveSemesterId = `${year.toUpperCase()}-${semesterId.toUpperCase()}`;
-      } else if (semesterId && !year) {
+      const cleanYear = year
+        ? String(year).toUpperCase().replace(/^0/, "O")
+        : undefined;
+
+      if (semesterId && cleanYear && !semesterId.includes(cleanYear)) {
+        effectiveSemesterId = `${cleanYear}-${semesterId.toUpperCase()}`;
+      } else if (semesterId && !cleanYear) {
         // If only semesterId is provided, allow matching regardless of year
         effectiveSemesterId = { endsWith: `-${semesterId.toUpperCase()}` };
-      } else if (!semesterId && year) {
+      } else if (!semesterId && cleanYear) {
         // If only year is provided
-        effectiveSemesterId = { startsWith: `${year.toUpperCase()}-` };
+        effectiveSemesterId = { startsWith: `${cleanYear}-` };
       }
 
       const displaySemester =
@@ -918,8 +922,9 @@ export const publishResults = async (
                 },
                 {
                   headers: {
-                    "x-internal-secret":
-                      process.env.INTERNAL_SECRET || "uniz-core",
+                    "x-internal-secret": (
+                      process.env.INTERNAL_SECRET || "uniz-core"
+                    ).trim(),
                   },
                 },
               );
@@ -968,7 +973,10 @@ export const publishResults = async (
   return res.json({
     success: true,
     message: "Result publishing started in background.",
-    target: { semesterId, year: year || "All" },
+    target: {
+      semesterId,
+      year: year ? String(year).replace(/^0/, "O") : "All",
+    },
   });
 };
 
@@ -991,10 +999,14 @@ export const publishAttendance = async (
       console.log(
         `[ATTENDANCE-PUBLISH] Starting for ${semesterId}, Year: ${year}`,
       );
+      const cleanYear = year
+        ? String(year).toUpperCase().replace(/^0/, "O")
+        : undefined;
+
       let effectiveSemesterId: any = semesterId;
-      if (semesterId && year && !semesterId.includes(year)) {
-        effectiveSemesterId = `${year.toUpperCase()}-${semesterId.toUpperCase()}`;
-      } else if (semesterId && !year) {
+      if (semesterId && cleanYear && !semesterId.includes(cleanYear)) {
+        effectiveSemesterId = `${cleanYear}-${semesterId.toUpperCase()}`;
+      } else if (semesterId && !cleanYear) {
         effectiveSemesterId = { endsWith: `-${semesterId.toUpperCase()}` };
       }
 
@@ -1010,7 +1022,7 @@ export const publishAttendance = async (
       if (year || branch) {
         where.subject = {
           AND: [
-            year ? { code: { contains: `-${year.toUpperCase()}-` } } : {},
+            cleanYear ? { code: { contains: `-${cleanYear}-` } } : {},
             branch ? { department: branch } : {},
           ],
         };
@@ -1022,7 +1034,12 @@ export const publishAttendance = async (
         include: { subject: true },
       });
 
-      if (attendance.length === 0) return;
+      if (attendance.length === 0) {
+        console.log(
+          `[ATTENDANCE-PUBLISH] No records found for ${JSON.stringify(where)}`,
+        );
+        return;
+      }
 
       // 2. Fetch Profiles for metadata
       const studentIds = [...new Set(attendance.map((a) => a.studentId))];
@@ -1104,8 +1121,9 @@ export const publishAttendance = async (
                 },
                 {
                   headers: {
-                    "x-internal-secret":
-                      process.env.INTERNAL_SECRET || "uniz-core",
+                    "x-internal-secret": (
+                      process.env.INTERNAL_SECRET || "uniz-core"
+                    ).trim(),
                   },
                 },
               );
@@ -1138,8 +1156,11 @@ export const publishAttendance = async (
 
   return res.json({
     success: true,
-    message: "Attendance result publishing started.",
-    target: { semesterId, year: year || "All" },
+    message: "Attendance result publishing completed.",
+    target: {
+      semesterId,
+      year: year ? String(year).replace(/^0/, "O") : "All",
+    },
   });
 };
 
