@@ -1,25 +1,47 @@
-import Redis from 'ioredis';
-import dotenv from 'dotenv';
+import Redis from "ioredis";
+import { Queue } from "bullmq";
+import dotenv from "dotenv";
 
 dotenv.config();
 
 const redisUrl = process.env.REDIS_URL;
 
+// General Redis Options
 const options = {
-    maxRetriesPerRequest: 10,
-    connectTimeout: 10000,
+  maxRetriesPerRequest: 10,
+  connectTimeout: 10000,
+};
+
+// BullMQ requires maxRetriesPerRequest to be null
+const queueOptions = {
+  connection: redisUrl
+    ? { url: redisUrl, maxRetriesPerRequest: null }
+    : { host: "localhost", port: 6379, maxRetriesPerRequest: null },
 };
 
 if (!redisUrl) {
-    console.log('REDIS_URL not found, connecting to local Docker Redis (localhost:6379)');
+  console.log(
+    "REDIS_URL not found, connecting to local Docker Redis (localhost:6379)",
+  );
 }
 
-export const redis = redisUrl ? new Redis(redisUrl, options) : new Redis(options);
+export const redis = redisUrl
+  ? new Redis(redisUrl, options)
+  : new Redis(options);
 
-redis.on('error', (err) => {
-    console.error('Redis connection error:', err);
+// Reuse Redis connection config but ensure compatibility with BullMQ
+export const notificationQueue = new Queue("notification-queue", {
+  connection: redisUrl
+    ? new Redis(redisUrl, { maxRetriesPerRequest: null })
+    : new Redis({ maxRetriesPerRequest: null }),
 });
 
-redis.on('connect', () => {
-    console.log(redisUrl ? 'Connected to Redis Cloud' : 'Connected to Local Docker Redis');
+redis.on("error", (err) => {
+  console.error("Redis connection error:", err);
+});
+
+redis.on("connect", () => {
+  console.log(
+    redisUrl ? "Connected to Redis Cloud" : "Connected to Local Docker Redis",
+  );
 });

@@ -8,7 +8,7 @@ const GATEWAY_URL = process.env.GATEWAY_URL || "http://localhost:3000/api/v1";
 
 const getHeaders = (token: string) => ({ headers: { Authorization: token } });
 
-import { redis } from "../utils/redis.util";
+import { redis, notificationQueue } from "../utils/redis.util";
 import { generateMotivation } from "../utils/ai.util";
 
 // GPA calculation and templates now use database-provided subject credits.
@@ -892,7 +892,7 @@ export const publishResults = async (
 
       // 4. Send Emails via Microservice
       let sentCount = 0;
-      const chunkSize = 10; // Optimized chunk size
+      const chunkSize = 50; // Optimized for Redis queue throughput
 
       for (let i = 0; i < total; i += chunkSize) {
         const batch = students.slice(i, i + chunkSize);
@@ -906,35 +906,24 @@ export const publishResults = async (
             const campus = "Ongole";
 
             try {
-              const mailRes = await axios.post(
-                `${GATEWAY_URL}/mail/send`,
+              // Push to Queue (Fire and Forget)
+              await notificationQueue.add(
+                "RESULTS",
                 {
-                  type: "results",
-                  to: email,
-                  data: {
-                    username: studentId,
-                    name,
-                    branch,
-                    campus,
-                    semesterId: displaySemester,
-                    grades: studentGrades[studentId],
-                  },
+                  username: studentId,
+                  name,
+                  branch,
+                  campus,
+                  semesterId: displaySemester,
+                  grades: studentGrades[studentId],
                 },
-                {
-                  headers: {
-                    "x-internal-secret": (
-                      process.env.INTERNAL_SECRET || "uniz-core"
-                    ).trim(),
-                  },
-                },
+                { removeOnComplete: true },
               );
 
-              if (mailRes.data && mailRes.data.success) {
-                sentCount++;
-              }
+              sentCount++;
             } catch (e: any) {
               console.error(
-                `[Publish] Failed email for ${studentId}: ${e.message}`,
+                `[Publish] Failed to queue email for ${studentId}: ${e.message}`,
               );
             }
           }),
@@ -1091,9 +1080,9 @@ export const publishAttendance = async (
         }),
       );
 
-      // 4. Send Emails
+      // 4. Send Emails via Queue
       let sentCount = 0;
-      const chunkSize = 10;
+      const chunkSize = 50;
 
       for (let i = 0; i < total; i += chunkSize) {
         const batch = students.slice(i, i + chunkSize);
@@ -1103,33 +1092,23 @@ export const publishAttendance = async (
             const profile = profilesMap[studentId];
 
             try {
-              console.log(
-                `[Publish-Att] Sending mail to ${email} via ${GATEWAY_URL}/mail/send`,
-              );
-              const mailRes = await axios.post(
-                `${GATEWAY_URL}/mail/send`,
+              await notificationQueue.add(
+                "ATTENDANCE_REPORT",
                 {
-                  type: "attendance_report",
-                  to: email,
-                  data: {
-                    username: studentId,
-                    name: profile?.name || "Student",
-                    branch: profile?.branch || "General",
-                    semesterId: displaySemester,
-                    records: studentAttendance[studentId],
-                  },
+                  username: studentId,
+                  name: profile?.name || "Student",
+                  branch: profile?.branch || "General",
+                  campus: "Ongole",
+                  semesterId: displaySemester,
+                  records: studentAttendance[studentId],
                 },
-                {
-                  headers: {
-                    "x-internal-secret": (
-                      process.env.INTERNAL_SECRET || "uniz-core"
-                    ).trim(),
-                  },
-                },
+                { removeOnComplete: true },
               );
 
-              if (mailRes.data && mailRes.data.success) sentCount++;
-            } catch (e: any) {}
+              sentCount++;
+            } catch (e: any) {
+              console.error(`[Publish-Att] Failed to queue: ${e.message}`);
+            }
           }),
         );
 
